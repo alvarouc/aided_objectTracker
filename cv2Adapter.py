@@ -2,6 +2,25 @@
 
 import cv2
 
+class WriteElement(object):
+    
+    def __init__(self, video_path):
+        self.video_path = video_path
+        
+    def __enter__(self):
+        self.cap = cv2.VideoWriter(self.video_path + "_out.avi" ,
+                                   fourcc = cv2.cv.CV_FOURCC(*'XVID'),
+                                   fps = 30,
+                                   frameSize = (640,480))
+        return self
+
+    def __exit__(self, exctype, excinst, exctb):
+        self.cap.release()
+
+    def write_frame(self, img):
+        self.cap.write(cv2.resize(img, (640,480)))
+        
+
 class CaptureElement(object):
     
     def __init__(self, video_path):

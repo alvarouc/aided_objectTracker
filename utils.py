@@ -1,9 +1,10 @@
+from __future__ import with_statement
 import numpy as np
 import cv2
 import progressbar as pb
 import cPickle
 import matplotlib.pyplot as plt
-from cv2Adapter import CaptureElement
+from cv2Adapter import CaptureElement, WriteElement
 from sklearn.cluster import KMeans
 import seaborn as sns
 
@@ -402,4 +403,73 @@ def writeMatch(video_path, tracker_data):
         pbar.finish()
 
     cap_out.release()
+
+
+class OpticalFlow(object):
+
+    def __init__(self, video_path):
+        self.video_path = video_path
+
+    def demo(self):
+        'Demo for Optical flow, draw flow vectors and write to video'
+        
+        with CaptureElement(self.video_path) as ce, WriteElement(self.video_path) as we:
+            pbar = startBar("Computing flow vectors", len(ce.frames))
+            hsv = np.zeros_like(ce.frames[0])
+            hsv[...,1] = 255
+            for n, img in enumerate(ce.frames):
+                # First run
+                if n < 1:
+                    prev_frame = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                else:
+                    current_frame = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                    flow = cv2.calcOpticalFlowFarneback(prev_frame, current_frame, 0.5, 3, 15, 3, 5, 1.2, 0)
+                    
+                    # Reformatting for display
+                    mag, ang = cv2.cartToPolar(flow[...,0], flow[...,1])
+                    hsv[...,0] = ang*180/np.pi/2
+                    hsv[...,2] = cv2.normalize(mag,None,0,255,cv2.NORM_MINMAX)
+                    rgb = cv2.cvtColor(hsv,cv2.COLOR_HSV2BGR)
+                    we.write_frame(rgb)
+                    
+                    prev_frame = current_frame.copy()
+                pbar.update(n)
+        pbar.finish()
+                
+class HistBackProj(object):
+    def __init__(self, video_path):
+        self.video_path = video_path
+
+    def demo(self):
+        'Demo of histogram back projection for Camshift algorithm'
+        with ObjectSelector(self.video_path) as osv:
+            selector_data = osv.run()
+        roi = selector_data['obj']        
+
+        # Set up
+        # Disc convolution kernel
+        disc = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(10,10))
+        # histogram of hsv channels from selected object
+        hsv = cv2.cvtColor(roi,cv2.COLOR_BGR2HSV)
+        #roihist = cv2.calcHist([hsv],[0, 1], None, [180, 256], [0, 180, 0, 256] )
+        roihist = cv2.calcHist([hsv],[0, 1], None, [45, 64], [0, 180, 0, 256] )
+        cv2.normalize(roihist,roihist,0,255,cv2.NORM_MINMAX)
+
+        with CaptureElement(self.video_path) as ce, WriteElement(self.video_path) as we:
+            pbar = startBar("Computing Histogram back projection", len(ce.frames))
+            for n, img in enumerate(ce.frames):
+                # Current frame hsv 
+                hsvt = cv2.cvtColor(img,cv2.COLOR_BGR2HSV)
+                dst = cv2.calcBackProject([hsvt],[0,1],roihist,[0,180,0,256],1)
+                cv2.filter2D(dst,-1,disc,dst)
+                ret,thresh = cv2.threshold(dst,50,255,0)
+                thresh = cv2.merge((thresh,thresh,thresh))
+                res = cv2.bitwise_and(img,thresh)
+                # Write output
+                we.write_frame(res)
+                pbar.update(n)
+        pbar.finish()
+
+
+
 
