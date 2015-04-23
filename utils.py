@@ -452,7 +452,7 @@ class HistBackProj(object):
         # histogram of hsv channels from selected object
         hsv = cv2.cvtColor(roi,cv2.COLOR_BGR2HSV)
         #roihist = cv2.calcHist([hsv],[0, 1], None, [180, 256], [0, 180, 0, 256] )
-        roihist = cv2.calcHist([hsv],[0, 1], None, [45, 64], [0, 180, 0, 256] )
+        roihist = cv2.calcHist([hsv],[0, 1], None, [45, 256], [0, 180, 0, 256] )
         cv2.normalize(roihist,roihist,0,255,cv2.NORM_MINMAX)
 
         with CaptureElement(self.video_path) as ce, WriteElement(self.video_path) as we:
@@ -471,5 +471,23 @@ class HistBackProj(object):
         pbar.finish()
 
 
+class KeyPoint(object):
+    def __init__(self, video_path):
+        self.video_path = video_path
 
-
+    def demo(self):
+        'Demo of Key Points algorithm'
+        surf = cv2.SURF(400)
+        surf.hessianThreshold = 5000
+        surf.upright = True
+        with CaptureElement(self.video_path) as ce, WriteElement(self.video_path) as we:
+            pbar = startBar("Computing Key points", len(ce.frames))
+            for n, img in enumerate(ce.frames):
+                kps, des = surf.detectAndCompute(img, None)
+                points = [ map(int, kp.pt) for kp in kps]
+                [ cv2.circle(img, tuple(point),
+                             radius=10, color=(0,0,255),
+                             thickness=-1) for point in points]
+                we.write_frame(img)
+                pbar.update(n)
+        pbar.finish()

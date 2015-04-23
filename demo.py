@@ -10,6 +10,7 @@ from utils import (
     setGTVideo,
     OpticalFlow,
     HistBackProj,
+    KeyPoint,
     )
 import cv2
 from cv2 import matchTemplate, minMaxLoc
@@ -29,7 +30,9 @@ if __name__ == '__main__':
     # Optical flow demo
     #OpticalFlow(video_path).demo()
     # Histogram back projection demo
-    HistBackProj(video_path).demo()
+    #HistBackProj(video_path).demo()
+    # Key points demo
+    KeyPoint(video_path).demo()
 
     #video_path = '/home/aulloa/data/aolme/test.mov'
     
