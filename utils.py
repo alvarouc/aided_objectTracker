@@ -491,3 +491,24 @@ class KeyPoint(object):
                 we.write_frame(img)
                 pbar.update(n)
         pbar.finish()
+
+class BigVideo(object):
+    def __init__(self, video_paths):
+        self.video_paths = video_paths
+        assert len(self.video_paths) == 4
+
+    def write(self):
+        with CaptureElement(self.video_paths[0]) as ce0,\
+        CaptureElement(self.video_paths[1]) as ce1,\
+        CaptureElement(self.video_paths[2]) as ce2,\
+        CaptureElement(self.video_paths[3]) as ce3,\
+        WriteElement(self.video_paths[0]) as we:
+            
+            for img in zip(ce0.frames, ce1.frames, ce2.frames, ce3.frames):
+                
+                img = map(lambda x: cv2.resize(x,(320, 240)), img)
+                out_img = np.hstack((np.vstack((img[0], img[1])), 
+                                     np.vstack((img[2],img[3]))))
+                we.write_frame(out_img)
+
+

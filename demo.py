@@ -11,6 +11,7 @@ from utils import (
     OpticalFlow,
     HistBackProj,
     KeyPoint,
+    BigVideo
     )
 import cv2
 from cv2 import matchTemplate, minMaxLoc
@@ -32,10 +33,16 @@ if __name__ == '__main__':
     # Histogram back projection demo
     #HistBackProj(video_path).demo()
     # Key points demo
-    KeyPoint(video_path).demo()
-
-    #video_path = '/home/aulloa/data/aolme/test.mov'
+    #KeyPoint(video_path).demo()
     
+    #Video concatenation for presentation
+    video_paths =['/home/aulloa/data/aolme/test.mov',
+                  '/home/aulloa/data/aolme/results/test.histBack.avi',
+                  '/home/aulloa/data/aolme/results/test.opticalFlow.avi',
+                  '/home/aulloa/data/aolme/results/test.keyPoints.avi',
+    ]
+    
+    BigVideo(video_paths).write()
     # Select and crop an object from video
     #with ObjectSelector(video_path) as osv:
     #    selector_data = osv.run()
