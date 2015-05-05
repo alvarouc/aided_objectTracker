@@ -9,7 +9,7 @@ class WriteElement(object):
         
     def __enter__(self):
         self.cap = cv2.VideoWriter(self.video_path + "_out.avi" ,
-                                   fourcc = cv2.cv.CV_FOURCC(*'XVID'),
+                                   fourcc = *'XVID',
                                    fps = 30,
                                    frameSize = (640,480))
         return self
@@ -47,7 +47,7 @@ class Frame(object):
     
     def __init__(self,oldCap):
         self.oldCap = oldCap
-        self.oldCap.set(cv2.cv.CV_CAP_PROP_POS_FRAMES, 0)
+        self.oldCap.set(cv2.CAP_PROP_POS_FRAMES, 0)
         
     def __iter__(self):
         return self
@@ -60,7 +60,7 @@ class Frame(object):
             raise StopIteration()
 
     def __len__(self):
-        return self.oldCap.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT)
+        return self.oldCap.get(cv2.CAP_PROP_FRAME_COUNT)
         
     # This is slower than next but more flexible as it can be called
     # with list indexing.
@@ -68,6 +68,6 @@ class Frame(object):
         if index >= len(self):
             raise IndexError
         else:
-            self.oldCap.set(cv2.cv.CV_CAP_PROP_POS_FRAMES, index)
+            self.oldCap.set(cv2.CAP_PROP_POS_FRAMES, index)
         return self.oldCap.read()[1]
 

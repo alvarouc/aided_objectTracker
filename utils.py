@@ -92,6 +92,9 @@ def track(video_path, selector_data):
             y1 = max(y - Npix, 0)
             y2 = min(y + h + Npix, img.shape[0])
             location.append(loc)
+            if conf < 0.8:
+                with ObjectSelector(video_path) as osv:
+                    selector_data = osv.run()
             confidence.append(conf)
             pbar.update(n)
         pbar.finish()
@@ -158,7 +161,6 @@ class ObjectSelector(object):
         self.drag_start = None
         # Set to rect when the mouse drag finishes
         self.track_window = None
-        self.path = video_path
 
     def on_mouse(self, event, x, y, flags, param):
         if event == cv2.cv.CV_EVENT_LBUTTONDOWN:
@@ -182,7 +184,7 @@ class ObjectSelector(object):
         cv2.namedWindow('Selected object', cv2.WINDOW_AUTOSIZE)
         cv2.namedWindow( "Input Image", cv2.WINDOW_NORMAL )
         cv2.resizeWindow("Input Image", 800, 800)
-        cv2.cv.SetMouseCallback( "Input Image", self.on_mouse)
+        cv2.setMouseCallback( "Input Image", self.on_mouse)
         return self
     
     def __exit__(self, exctype, excinst, exctb):
