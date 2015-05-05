@@ -80,7 +80,7 @@ def track(video_path, selector_data):
             #(conf, loc) = camShiftMatch(img, selector_data)
             selector_data['obj'] = img[y1 : y2, x1 : x2, :][loc[1] : loc[1] + w, loc[0] : loc[0] + h, :]
             conf = histMatch(obj, selector_data)
-            print conf
+            #print conf
             if conf < 0.2:
                 with ObjectSelector(video_path, n) as osv:
                     temp_data = osv.run()
@@ -185,7 +185,7 @@ class ObjectSelector(object):
         cv2.namedWindow( "Input Image", cv2.WINDOW_NORMAL )
         cv2.resizeWindow("Input Image", 800, 800)
         cv2.setMouseCallback( "Input Image", self.on_mouse)
-        #cv2.startWindowThread()
+        cv2.startWindowThread()
         return self
     
     def __exit__(self, exctype, excinst, exctb):
@@ -194,8 +194,9 @@ class ObjectSelector(object):
     def run(self):
         c = 0
         framePosition = self.framePosition
+        obj = None
         with CaptureElement(self.video_path) as ce:
-            while c != 's':
+            while c != 's' and obj:
                 img  = ce.frames[framePosition]
                 tmp = np.copy(img)
                 # If mouse is pressed, highlight the current selected
@@ -217,8 +218,8 @@ class ObjectSelector(object):
                 # Go Back one frame
                 if c == 'b':
                     framePosition -= 1
-                    if framePosition<0: 
-                        framePosition =0
+                    if framePosition < 0: 
+                        framePosition = 0
                 # Go fordward one frame    
                 if c == 'f':
                     framePosition += 1
