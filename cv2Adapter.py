@@ -9,7 +9,7 @@ class WriteElement(object):
         
     def __enter__(self):
         self.cap = cv2.VideoWriter(self.video_path + "_out.avi" ,
-                                   fourcc = *'XVID',
+                                   fourcc = ('X','V','I','D'),
                                    fps = 30,
                                    frameSize = (640,480))
         return self

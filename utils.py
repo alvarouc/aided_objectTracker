@@ -16,58 +16,52 @@ class setGTVideo(object):
         self.point = []
 
     def on_click(self,event, x,y,flags,param):
-        if event == cv2.cv.CV_EVENT_LBUTTONDOWN:
+        if event == cv2.EVENT_LBUTTONDOWN:
             self.point.append((x, y))
             print (x,y)
             
     def run(self):
         cv2.namedWindow('video', cv2.WINDOW_NORMAL)
-        cv2.cv.SetMouseCallback('video', self.on_click)
+        cv2.setMouseCallback('video', self.on_click)
         with CaptureElement(self.video_path) as ce:
             for img in ce.frames:
                 cv2.imshow('video', img)
                 cv2.waitKey(-1)
     
 
+def corrMatch(img, selector_data):
+    # Matches obj in img
+    # Works for color or gray images
+    # Returns position of obj in img and confidence measure
+    result = cv2.matchTemplate(img,templ = selector_data['obj'],
+                               method = cv2.TM_CCORR_NORMED)
+    _,maxVal,_,maxLoc = cv2.minMaxLoc(result)
+    return(maxVal, maxLoc)
+
+def histMatch(img, selector_data):
+    
+    # histogram of img
+    hist_img = cv2.calcHist( [img], [0, 1, 2], None, [16, 16, 16], 
+                             [0, 255, 0, 255, 0, 255] )
+    cv2.normalize(hist_img, hist_img, 0, 255, cv2.NORM_MINMAX);
+    hist_img = hist_img.reshape(-1)
+    # histogram of obj
+    obj = selector_data['obj']
+    hist_obj = cv2.calcHist( [obj], [0, 1, 2], None, [16, 16, 16], 
+                             [0, 255, 0, 255, 0, 255] )
+    cv2.normalize(hist_obj, hist_obj, 0, 255, cv2.NORM_MINMAX);
+    hist_obj = hist_obj.reshape(-1)
+    
+    # correlation
+    conf = cv2.compareHist(hist_img, hist_obj, cv2.HISTCMP_CORREL)
+    
+    return(conf)
 
 # Cross correlation tracking
 def track(video_path, selector_data):
 
-    def corrMatch(img, selector_data):
-        # Matches obj in img
-        # Works for color or gray images
-        # Returns position of obj in img and confidence measure
-        result = cv2.matchTemplate(img,templ = selector_data['obj'],
-                                   method = cv2.cv.CV_TM_CCORR_NORMED)
-        _,maxVal,_,maxLoc = cv2.minMaxLoc(result)
-        return(maxVal, maxLoc)
-
-    def camShiftMatch(img, selector_data):
-         
-        # image (RGB to  HSV)
-        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, np.array((0., 0., 0.)),
-                           np.array((180., 255., 32.)))
-        # object (RGB to HSV)
-        hsv_roi = cv2.cvtColor(selector_data['obj'], 
-                               cv2.COLOR_BGR2HSV)
-        mask_roi = cv2.inRange(selector_data['obj'], np.array((0., 0., 0.)), 
-                               np.array((180., 255., 32.)))
-        # histogram of object
-        hist = cv2.calcHist( [hsv_roi], [0], None, [16], [0, 180] )
-        cv2.normalize(hist, hist, 0, 255, cv2.NORM_MINMAX);
-        hist = hist.reshape(-1)
-        
-        # back projections of object histogram to image
-        prob = cv2.calcBackProject([hsv], [0],hist,[0, 180], 1)
-        prob &= mask
-        term_crit = ( cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 1 )
-        _, loc = cv2.CamShift(prob, selector_data['selection'], term_crit)
-        
-        return(1, loc[:2])
-
     # Parse data from object selector
-    obj = selector_data['obj']
+    obj = np.copy(selector_data['obj'])
     framePosition = selector_data['framePosition']
 
     # Track selected object
@@ -82,19 +76,24 @@ def track(video_path, selector_data):
                         len(ce.frames) - framePosition)
         # start tracking from frame of selected object
         for n,img in enumerate(ce.frames):
-            (conf, loc) = corrMatch(img[y1 : y2, x1 : x2, :], selector_data)
+            (_, loc) = corrMatch(img[y1 : y2, x1 : x2, :], selector_data)
             #(conf, loc) = camShiftMatch(img, selector_data)
             selector_data['obj'] = img[y1 : y2, x1 : x2, :][loc[1] : loc[1] + w, loc[0] : loc[0] + h, :]
-            loc = (x1+loc[0], y1+loc[1])
+            conf = histMatch(obj, selector_data)
+            print conf
+            if conf < 0.2:
+                with ObjectSelector(video_path, n) as osv:
+                    temp_data = osv.run()
+                    obj = temp_data['obj']
+                    loc = temp_data['selection'][:2]
+            else:
+                loc = (x1+loc[0], y1+loc[1])
             (x,y) = loc
             x1 = max(x - Npix, 0)
             x2 = min(x + w + Npix, img.shape[1])
             y1 = max(y - Npix, 0)
             y2 = min(y + h + Npix, img.shape[0])
             location.append(loc)
-            if conf < 0.8:
-                with ObjectSelector(video_path) as osv:
-                    selector_data = osv.run()
             confidence.append(conf)
             pbar.update(n)
         pbar.finish()
@@ -156,16 +155,17 @@ def plotResults(video_path, tracker_data):
 
 class ObjectSelector(object):
 
-    def __init__(self, video_path):
+    def __init__(self, video_path, framePosition = 0):
         self.video_path = video_path
         self.drag_start = None
         # Set to rect when the mouse drag finishes
         self.track_window = None
+        self.framePosition = framePosition
 
     def on_mouse(self, event, x, y, flags, param):
-        if event == cv2.cv.CV_EVENT_LBUTTONDOWN:
+        if event == cv2.EVENT_LBUTTONDOWN:
             self.drag_start = (x, y)
-        if event == cv2.cv.CV_EVENT_LBUTTONUP:
+        if event == cv2.EVENT_LBUTTONUP:
             self.drag_start = None
             self.track_window = self.selection
         if self.drag_start:
@@ -185,6 +185,7 @@ class ObjectSelector(object):
         cv2.namedWindow( "Input Image", cv2.WINDOW_NORMAL )
         cv2.resizeWindow("Input Image", 800, 800)
         cv2.setMouseCallback( "Input Image", self.on_mouse)
+        #cv2.startWindowThread()
         return self
     
     def __exit__(self, exctype, excinst, exctb):
@@ -192,9 +193,9 @@ class ObjectSelector(object):
 
     def run(self):
         c = 0
-        framePosition = 0
+        framePosition = self.framePosition
         with CaptureElement(self.video_path) as ce:
-            while c != ord("s"):
+            while c != 's':
                 img  = ce.frames[framePosition]
                 tmp = np.copy(img)
                 # If mouse is pressed, highlight the current selected
@@ -212,16 +213,16 @@ class ObjectSelector(object):
                     cv2.imshow('Selected object', obj)
 
                 cv2.imshow("Input Image", tmp)
-                c = cv2.waitKey(7)
+                c = chr(cv2.waitKey(7) & 255)
                 # Go Back one frame
-                if c == ord("b"):
+                if c == 'b':
                     framePosition -= 1
                     if framePosition<0: 
                         framePosition =0
                 # Go fordward one frame    
-                if c == ord("f"):
+                if c == 'f':
                     framePosition += 1
-                    if framePosition>= len(ce.frames):
+                    if framePosition >= len(ce.frames):
                         framePosition = len(ce.frames)-1
         selector_data = {'obj' : obj,
                         'framePosition' : framePosition,
@@ -333,9 +334,9 @@ def drawMatches(img1, kp1, img2, kp2, matches):
     """
     # Convert all images into gray scale
     if len(img1.shape)==3:
-        img1 = cv2.cvtColor(img1,cv2.cv.CV_BGR2GRAY)
+        img1 = cv2.cvtColor(img1,cv2.COLOR_BGR2GRAY)
     if len(img2.shape)==3:
-        img2 = cv2.cvtColor(img2,cv2.cv.CV_BGR2GRAY)
+        img2 = cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
     
     # Create a new output image that concatenates the two images together
     # (a.k.a) a montage
@@ -390,15 +391,19 @@ def writeMatch(video_path, tracker_data):
     confidence = tracker_data['confidence']
     # Set video format
     cap_out = cv2.VideoWriter(video_path + ".out.avi" ,
-                              fourcc = cv2.cv.CV_FOURCC(*'XVID'),
+                              fourcc = cv2.VideoWriter_fourcc(*'XVID'),
                               fps = 30,
                               frameSize = (640,480))
 
     with CaptureElement(video_path) as ce:
         pbar = startBar("Writing video", len(ce.frames))
         for n,img in enumerate(ce.frames):            
+            #if confidence[n] > 0.5:
+            #    cv2.circle(img, location[n], radius = 30,
+            #               color = (255, 255, 255),thickness = -1)
+            #else:
             cv2.circle(img, location[n], radius = 30,
-                       color = (0, 0, 255),thickness = -1)
+                       color = (0, 0, int(255*confidence[n])),thickness = -1)
             img = cv2.resize(img, (640, 480))
             cap_out.write(img)
             pbar.update(n)
